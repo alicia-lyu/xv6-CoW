@@ -34,6 +34,7 @@ kinit(void)
 
   initlock(&kmem.lock, "kmem");
   p = (char*)PGROUNDUP((uint)end);
+  kmem.free_pages = 0;
   for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE)
     kfree(p);
 }
