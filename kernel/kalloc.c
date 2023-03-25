@@ -48,7 +48,8 @@ kfree(char *v)
 {
   struct run *r;
 
-  if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
+  if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP || kmem.ref_cnt[(uint)v / PGSIZE] != 1) 
+  // page must be used no more than 1 process when freed 
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
@@ -74,9 +75,24 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
+  kmem.ref_cnt[(uint)r / PGSIZE] = 1; // when a page is allocated, set ref_cnt to 1
   kmem.free_pages -= 1; // one less free page after kalloc
   release(&kmem.lock);
   return (char*)r;
+}
+
+char* kincrement(char *v) {
+  acquire(&kmem.lock);
+  kmem.ref_cnt[(uint)v / PGSIZE]++;
+  acquire(&kmem.lock);
+}
+
+char* kdecrement(char *v) {
+  acquire(&kmem.lock);
+  if (kmem.ref_cnt[(uint)v / PGSIZE] < 1)
+    panic("kdecrement");
+  kmem.ref_cnt[(uint)v / PGSIZE]--;
+  acquire(&kmem.lock);
 }
 
 int sys_getFreePagesCount(void){
