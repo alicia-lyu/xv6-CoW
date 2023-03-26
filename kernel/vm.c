@@ -130,7 +130,8 @@ static struct kmap {
   {(void*)0xFE000000, 0,               PTE_W},  // device mappings
 };
 
-// Set up kernel part of a page table.
+// Set up kernel part of a page table. (Each process 
+// has a page table of their own)
 pde_t*
 setupkvm(void)
 {
@@ -313,10 +314,13 @@ copyuvm(pde_t *pgdir, uint sz)
       panic("copyuvm: page not present");
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
+    // allocate a page-size memory in the address 
+    // space of the child process
     if((mem = kalloc()) == 0)
       goto bad;
-    
+    // copy the content of the page into the allocated memory
     memmove(mem, (char*)pa, PGSIZE);
+    // map the physical memory to a PTE of the child
     if(mappages(d, (void*)i, PGSIZE, PADDR(mem), flags) < 0)
       goto bad;
   }
@@ -326,6 +330,48 @@ bad:
   freevm(d);
   return 0;
 }
+
+// Given a parent process's page table, share it with 
+// the child process: increment every physical
+// page's ref_cnt and mark it as read-only, initialize 
+// child's page table and make its entries point to the 
+// same physical pages
+pde_t*
+cowuvm(pde_t *pgdir, uint sz)
+{
+  pde_t *d
+  pte_t *pte;
+  uint pa, i, flags;
+
+  // make changes to the physical pages
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walkpgdir(pgdir, (void*)i, 0)) == 0)
+      panic("copyuvm: pte should exist");
+    if(!(*pte & PTE_P))
+      panic("copyuvm: page not present");
+    // Do not need to allocate memory and copy the pages
+
+    // Change ref_cnt and flag of each PTE
+    kincrement((char*)i);
+    *pte &= ~PTE_W;
+  }
+  // Flush TLB
+  lcr3(PADDR(pgdir));
+  
+  // Set up child's pgdir in its own address space
+  if((d = setupkvm()) == 0)
+    return 0;
+  // copy parent's pgdir into d
+  memmove(d, pgdir, PGSIZE*sz);
+  
+  // Flush TLB (May be unnecessary, since TLB cannot 
+  // hold any translation of VPN in this newly generated
+  // page table)
+  lcr3(PADDR(d));
+
+  return d;
+}
+
 
 // Map user virtual address to kernel physical address.
 char*
