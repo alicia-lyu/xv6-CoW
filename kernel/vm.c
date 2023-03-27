@@ -374,10 +374,11 @@ cowuvm(pde_t *pgdir, uint sz)
 
 // cow page fault handler
 int cowpgflthandler(struct proc* p) {
-  uint va; // virtual address
+  uint va, pa, flags; // virtual address
   pde_t *pgdir;
   pte_t *pte;
   int ref_cnt;
+  char *mem;
 
   pgdir = p->pgdir;
 
@@ -388,14 +389,25 @@ int cowpgflthandler(struct proc* p) {
     panic("CoW: Page fault not incurred by CoW");
   }
   ref_cnt = kgetrefcnt(va);
+  pa = PTE_ADDR(*pte);
+  flags = PTE_FLAGS(*pte);
   if (ref_cnt > 1) {
     // copy the page and replace it with a writeable copy in the local 
     // process. Be sure to invalidate the TLB! Decrement the reference 
-    // count on the original page. 
+    // count on the original page.
+        if((mem = kalloc()) == 0)
+          panic("CoW: memory allocation failed");
+        memmove(mem, (char*)pa, PGSIZE);
+        if(mappages(pgdir, (void*)va, PGSIZE, PADDR(mem), flags || PTE_W) < 0)
+          panic("CoW: Page table mapping failed.");
+        kdecrement((char*)va);
+        lcr3(PADDR(pgdir));
   } else {
     // restore write permission to the page. No need to copy, as the 
     // other process has already copied the page. Be sure to invalidate 
     // the TLB!
+    
+
   }
 
 }
