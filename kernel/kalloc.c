@@ -35,8 +35,10 @@ kinit(void)
   initlock(&kmem.lock, "kmem");
   p = (char*)PGROUNDUP((uint)end);
   kmem.free_pages = 0;
-  for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE) {
+    kmem.ref_cnt[(uint)p / PGSIZE] = 1;
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by v,
@@ -48,9 +50,11 @@ kfree(char *v)
 {
   struct run *r;
 
-  if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP || kmem.ref_cnt[(uint)v / PGSIZE] != 1) 
+  if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
   // page must be used no more than 1 process when freed 
     panic("kfree");
+  else if (kmem.ref_cnt[(uint)v / PGSIZE] != 1)
+    panic("kfree page used by multiple processes.");
 
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
@@ -60,6 +64,7 @@ kfree(char *v)
   r->next = kmem.freelist;
   kmem.freelist = r;
   kmem.free_pages += 1; // add one free page
+  kmem.ref_cnt[(uint)r / PGSIZE] = 0;
   release(&kmem.lock);
 }
 
@@ -82,15 +87,13 @@ kalloc(void)
 }
 
 int kgetrefcnt(char *v) {
-  acquire(&kmem.lock);
   return kmem.ref_cnt[(uint)v / PGSIZE]++;
-  acquire(&kmem.lock);
 }
 
 void kincrement(char *v) {
   acquire(&kmem.lock);
   kmem.ref_cnt[(uint)v / PGSIZE]++;
-  acquire(&kmem.lock);
+  release(&kmem.lock);
 }
 
 void kdecrement(char *v) {
@@ -98,7 +101,7 @@ void kdecrement(char *v) {
   if (kmem.ref_cnt[(uint)v / PGSIZE] < 1)
     panic("kdecrement");
   kmem.ref_cnt[(uint)v / PGSIZE]--;
-  acquire(&kmem.lock);
+  release(&kmem.lock);
 }
 
 int sys_getFreePagesCount(void){

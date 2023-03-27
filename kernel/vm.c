@@ -374,7 +374,7 @@ bad:
 
 // cow page fault handler
 int cowpgflthandler(struct proc* p) {
-  uint va, pa, flags; // virtual address
+  uint va, pa, flags, i; // virtual address
   pde_t *pgdir;
   pte_t *pte;
   int ref_cnt;
@@ -393,7 +393,6 @@ int cowpgflthandler(struct proc* p) {
   }
   ref_cnt = kgetrefcnt((char*) va);
   pa = PTE_ADDR(*pte);
-  flags = PTE_FLAGS(*pte);
   if (ref_cnt > 1) {
     // copy the page and replace it with a writeable copy in the local 
     // process. Be sure to invalidate the TLB! Decrement the reference 
@@ -401,7 +400,12 @@ int cowpgflthandler(struct proc* p) {
         if((mem = kalloc()) == 0)
           panic("CoW: memory allocation failed");
         memmove(mem, (char*)pa, PGSIZE);
-        if(mappages(pgdir, (void*)va, PGSIZE, PADDR(mem), flags || PTE_W) < 0)
+        // clear present bit and write bit
+        *pte &= ~PTE_P;
+        *pte &= ~PTE_W;
+        flags = PTE_FLAGS(*pte);
+        i = va / PGSIZE * PGSIZE;
+        if(mappages(pgdir, (void*)i, PGSIZE, PADDR(mem), flags) < 0)
           panic("CoW: Page table mapping failed.");
         kdecrement((char*)va);
         lcr3(PADDR(pgdir));
