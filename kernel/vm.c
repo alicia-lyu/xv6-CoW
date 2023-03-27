@@ -419,8 +419,8 @@ int cowpgflthandler(struct proc* p) {
     // restore write permission to the page. No need to copy, as the 
     // other process has already copied the page. Be sure to invalidate 
     // the TLB!
-    
-
+    *pte |= PTE_W;
+    lcr3(PADDR(pgdir));
   }
 }
 
