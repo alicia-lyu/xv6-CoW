@@ -383,14 +383,15 @@ int cowpgflthandler(struct proc* p) {
   pgdir = p->pgdir;
 
   va = rcr2();
-  if((pte = walkpgdir(pgdir, (void*)va, 0)) == 0)
-      cprintf("CoW: Invalid virtual address");
-      return 0;
+  if((pte = walkpgdir(pgdir, (void*)va, 0)) == 0){
+    cprintf("CoW: Invalid virtual address");
+    return 0;
+  }
   if((*pte & PTE_W) != 0) {
     cprintf("CoW: Page fault not incurred by CoW");
     return 0;
   }
-  ref_cnt = kgetrefcnt(va);
+  ref_cnt = kgetrefcnt((char*) va);
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
   if (ref_cnt > 1) {
