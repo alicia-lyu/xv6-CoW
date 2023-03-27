@@ -373,7 +373,30 @@ cowuvm(pde_t *pgdir, uint sz)
 }
 
 // cow page fault handler
-int cowpgflthandler() {
+int cowpgflthandler(struct proc* p) {
+  uint va; // virtual address
+  pde_t *pgdir;
+  pte_t *pte;
+  int ref_cnt;
+
+  pgdir = p->pgdir;
+
+  va = rcr2();
+  if((pte = walkpgdir(pgdir, (void*)va, 0)) == 0)
+      panic("CoW: Invalid virtual address");
+  if((*pte & PTE_W) != 0) {
+    panic("CoW: Page fault not incurred by CoW");
+  }
+  ref_cnt = kgetrefcnt(va);
+  if (ref_cnt > 1) {
+    // copy the page and replace it with a writeable copy in the local 
+    // process. Be sure to invalidate the TLB! Decrement the reference 
+    // count on the original page. 
+  } else {
+    // restore write permission to the page. No need to copy, as the 
+    // other process has already copied the page. Be sure to invalidate 
+    // the TLB!
+  }
 
 }
 

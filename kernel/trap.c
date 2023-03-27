@@ -77,7 +77,7 @@ trap(struct trapframe *tf)
     break;
   case T_PGFLT:
     // or lapiceoi before cowpgflthandler?
-    cowpgflthandler();
+    cowpgflthandler(proc);
     lapiceoi();
   default:
     if(proc == 0 || (tf->cs&3) == 0){

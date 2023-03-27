@@ -81,13 +81,19 @@ kalloc(void)
   return (char*)r;
 }
 
-char* kincrement(char *v) {
+int kgetrefcnt(char *v) {
+  acquire(&kmem.lock);
+  return kmem.ref_cnt[(uint)v / PGSIZE]++;
+  acquire(&kmem.lock);
+}
+
+void kincrement(char *v) {
   acquire(&kmem.lock);
   kmem.ref_cnt[(uint)v / PGSIZE]++;
   acquire(&kmem.lock);
 }
 
-char* kdecrement(char *v) {
+void kdecrement(char *v) {
   acquire(&kmem.lock);
   if (kmem.ref_cnt[(uint)v / PGSIZE] < 1)
     panic("kdecrement");
