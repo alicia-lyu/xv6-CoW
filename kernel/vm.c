@@ -353,31 +353,18 @@ cowuvm(pde_t *pgdir, uint sz)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
+    kincrement((char*)i);
+    *pte &= ~PTE_W;
+    // Flush TLB
+    lcr3(PADDR(pgdir));  
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     // Do not need to allocate memory and copy the pages
     // Just map the physical memory to a PTE of the child
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
       goto bad;
-
     // Change ref_cnt and flag of each PTE
-    kincrement((char*)i);
-    *pte &= ~PTE_W;
   }
-
-  // Flush TLB
-  lcr3(PADDR(pgdir));  
-  
-  
-
-  // // copy parent's pgdir into d
-  // memmove(d, pgdir, sz/PGSIZE);
-  
-  // // Flush TLB (May be unnecessary, since TLB cannot 
-  // // hold any translation of VPN in this newly generated
-  // // page table)
-  // lcr3(PADDR(d));
-
   return d;
 
 bad:
@@ -397,9 +384,11 @@ int cowpgflthandler(struct proc* p) {
 
   va = rcr2();
   if((pte = walkpgdir(pgdir, (void*)va, 0)) == 0)
-      panic("CoW: Invalid virtual address");
+      cprintf("CoW: Invalid virtual address");
+      return 0;
   if((*pte & PTE_W) != 0) {
-    panic("CoW: Page fault not incurred by CoW");
+    cprintf("CoW: Page fault not incurred by CoW");
+    return 0;
   }
   ref_cnt = kgetrefcnt(va);
   pa = PTE_ADDR(*pte);
@@ -422,6 +411,7 @@ int cowpgflthandler(struct proc* p) {
     *pte |= PTE_W;
     lcr3(PADDR(pgdir));
   }
+  return 1;
 }
 
 // Map user virtual address to kernel physical address.
