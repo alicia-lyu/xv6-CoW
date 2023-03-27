@@ -339,7 +339,7 @@ bad:
 pde_t*
 cowuvm(pde_t *pgdir, uint sz)
 {
-  pde_t *d
+  pde_t *d;
   pte_t *pte;
   uint pa, i, flags;
 
@@ -362,7 +362,7 @@ cowuvm(pde_t *pgdir, uint sz)
   if((d = setupkvm()) == 0)
     return 0;
   // copy parent's pgdir into d
-  memmove(d, pgdir, PGSIZE*sz);
+  memmove(d, pgdir, sz/PGSIZE);
   
   // Flush TLB (May be unnecessary, since TLB cannot 
   // hold any translation of VPN in this newly generated
@@ -372,6 +372,10 @@ cowuvm(pde_t *pgdir, uint sz)
   return d;
 }
 
+// cow page fault handler
+int cowpgflthandler() {
+
+}
 
 // Map user virtual address to kernel physical address.
 char*
