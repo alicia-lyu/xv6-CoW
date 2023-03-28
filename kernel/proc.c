@@ -81,6 +81,7 @@ userinit(void)
   p = allocproc();
   acquire(&ptable.lock);
   initproc = p;
+  // cprintf("First user process: %d\n", p->pid);
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
@@ -136,7 +137,7 @@ fork(void)
 
   // Copy process state from p.
   if((np->pgdir = cowuvm(proc->pgdir, proc->sz)) == 0){
-    kfree(np->kstack);
+    kdecrement(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
@@ -221,7 +222,7 @@ wait(void)
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
-        kfree(p->kstack);
+        kdecrement(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
         p->state = UNUSED;

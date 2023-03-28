@@ -271,7 +271,7 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       pa = PTE_ADDR(*pte);
       if(pa == 0)
         panic("kfree");
-      kfree((char*)pa);
+      kdecrement((char*)pa);
       *pte = 0;
     }
   }
@@ -290,9 +290,9 @@ freevm(pde_t *pgdir)
   deallocuvm(pgdir, USERTOP, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P)
-      kfree((char*)PTE_ADDR(pgdir[i]));
+      kdecrement((char*)PTE_ADDR(pgdir[i]));
   }
-  kfree((char*)pgdir);
+  kdecrement((char*)pgdir);
 }
 
 // Given a parent process's page table, create a copy
@@ -347,29 +347,27 @@ cowuvm(pde_t *pgdir, uint sz)
   if((d = setupkvm()) == 0)
     return 0;
 
-  // make changes to the physical pages
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void*)i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
-    kincrement((char*)i);
-    *pte &= ~PTE_W;
+    // change both parent's and child's pte flags
+    *pte &= ~PTE_W; 
     // Flush TLB
-    lcr3(PADDR(pgdir));  
+    lcr3(PADDR(pgdir));
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     // Do not need to allocate memory and copy the pages
     // Just map the physical memory to a PTE of the child
-    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
-      goto bad;
-    // Change ref_cnt and flag of each PTE
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
+      freevm(d);
+      return 0;
+    }
+    // add ref_cnt
+    kincrement((char*)pa);
   }
   return d;
-
-bad:
-  freevm(d);
-  return 0;
 }
 
 // cow page fault handler
@@ -384,15 +382,19 @@ int cowpgflthandler(struct proc* p) {
 
   va = rcr2();
   if((pte = walkpgdir(pgdir, (void*)va, 0)) == 0){
-    cprintf("CoW: Invalid virtual address");
+    cprintf("CoW: Invalid virtual address\n");
     return 0;
   }
-  if((*pte & PTE_W) != 0) {
-    cprintf("CoW: Page fault not incurred by CoW");
+  if ((*pte & PTE_P) == 0) { // not present
+      cprintf("CoW: Not present virtual address\n");
+      return 0;
+  }
+  if((*pte & PTE_W) != 0) { // writable
+    cprintf("CoW: Page fault not incurred by CoW\n");
     return 0;
   }
-  ref_cnt = kgetrefcnt((char*) va);
   pa = PTE_ADDR(*pte);
+  ref_cnt = kgetrefcnt((char*) pa);
   if (ref_cnt > 1) {
     // copy the page and replace it with a writeable copy in the local 
     // process. Be sure to invalidate the TLB! Decrement the reference 
@@ -402,12 +404,14 @@ int cowpgflthandler(struct proc* p) {
         memmove(mem, (char*)pa, PGSIZE);
         // clear present bit and write bit
         *pte &= ~PTE_P;
-        *pte &= ~PTE_W;
+        *pte |= PTE_W;
         flags = PTE_FLAGS(*pte);
         i = va / PGSIZE * PGSIZE;
         if(mappages(pgdir, (void*)i, PGSIZE, PADDR(mem), flags) < 0)
           panic("CoW: Page table mapping failed.");
-        kdecrement((char*)va);
+        // change ref_cnt
+        kdecrement((char*)pa);
+        kincrement((char*)PADDR(mem));
         lcr3(PADDR(pgdir));
   } else {
     // restore write permission to the page. No need to copy, as the 

@@ -76,10 +76,9 @@ trap(struct trapframe *tf)
     lapiceoi();
     break;
   case T_PGFLT:
-    // or lapiceoi before cowpgflthandler?
     int ret = cowpgflthandler(proc);
-    lapiceoi();
     if (ret == 1) {
+      lapiceoi();
       break;
     } // else continue to default
   default:

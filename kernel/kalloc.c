@@ -7,6 +7,7 @@
 #include "param.h"
 #include "mmu.h"
 #include "spinlock.h"
+#include "proc.h"
 
 struct run {
   struct run *next;
@@ -49,12 +50,15 @@ void
 kfree(char *v)
 {
   struct run *r;
+  uint ref;
 
   if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
-  // page must be used no more than 1 process when freed 
     panic("kfree");
-  else if (kmem.ref_cnt[(uint)v / PGSIZE] != 1)
+  else if ((ref = kmem.ref_cnt[(uint)v / PGSIZE]) != 1) {
+    cprintf("%d ref_cnt: %d\n", (uint)v, ref);
     panic("kfree page used by multiple processes.");
+    // page must be used no more than 1 process when freed 
+  }
 
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
@@ -79,6 +83,7 @@ kalloc(void)
   acquire(&kmem.lock);
   r = kmem.freelist;
   if(r) {
+    // cprintf("Allocated one more page for proc %d\n", proc->pid);
     kmem.freelist = r->next;
     kmem.ref_cnt[(uint)r / PGSIZE] = 1; // when a page is allocated, set ref_cnt to 1
   }
@@ -94,15 +99,19 @@ int kgetrefcnt(char *v) {
 void kincrement(char *v) {
   acquire(&kmem.lock);
   kmem.ref_cnt[(uint)v / PGSIZE]++;
+  // cprintf("kincrement to %d by proc id %d\n", (uint)v, proc->pid);
   release(&kmem.lock);
 }
 
 void kdecrement(char *v) {
-  acquire(&kmem.lock);
-  if (kmem.ref_cnt[(uint)v / PGSIZE] < 1)
-    panic("kdecrement");
-  kmem.ref_cnt[(uint)v / PGSIZE]--;
-  release(&kmem.lock);
+  if (kmem.ref_cnt[(uint)v / PGSIZE] == 1) {
+    kfree(v);
+  } else {
+    acquire(&kmem.lock);
+    // cprintf("kdecrement to %d by proc id %d\n", (uint)v, proc->pid);
+    kmem.ref_cnt[(uint)v / PGSIZE]--;
+    release(&kmem.lock);
+  }
 }
 
 int sys_getFreePagesCount(void){
