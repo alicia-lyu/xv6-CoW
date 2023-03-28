@@ -61,10 +61,10 @@ kfree(char *v)
 
   acquire(&kmem.lock);
   r = (struct run*)v;
+  kmem.ref_cnt[(uint)r / PGSIZE] = 0;
   r->next = kmem.freelist;
   kmem.freelist = r;
   kmem.free_pages += 1; // add one free page
-  kmem.ref_cnt[(uint)r / PGSIZE] = 0;
   release(&kmem.lock);
 }
 
@@ -78,16 +78,17 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r) {
     kmem.freelist = r->next;
-  kmem.ref_cnt[(uint)r / PGSIZE] = 1; // when a page is allocated, set ref_cnt to 1
+    kmem.ref_cnt[(uint)r / PGSIZE] = 1; // when a page is allocated, set ref_cnt to 1
+  }
   kmem.free_pages -= 1; // one less free page after kalloc
   release(&kmem.lock);
   return (char*)r;
 }
 
 int kgetrefcnt(char *v) {
-  return kmem.ref_cnt[(uint)v / PGSIZE]++;
+  return kmem.ref_cnt[(uint)v / PGSIZE];
 }
 
 void kincrement(char *v) {
