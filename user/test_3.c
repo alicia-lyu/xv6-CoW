@@ -18,8 +18,8 @@ int main(void) {
     int pid2 = fork();
 
     if(pid2 == 0) {
-        printf(1, "child\n");
         int mypid = getpid();
+        printf(1, "child %d\n", mypid);
         int child_free_cnt1 = getFreePagesCount();
         for(int i = 0; i < sz; i++){
             arr[i] = i * mypid;
@@ -32,13 +32,19 @@ int main(void) {
         for(int i = 0; i < sz; i++){
             arr3[i] = i * mypid;
         }
+        int* arr4 = (int*)malloc(sz * sizeof(int));
+        for(int i = 0; i < sz; i++){
+            arr4[i] = i * mypid;
+        }
         free(arr);
         free(arr2);
         free(arr3);
         int child_free_cnt2 = getFreePagesCount();
         printf(1, "Free pages changed by child. Before: %d, after: %d\n", child_free_cnt1, child_free_cnt2);
+        exit();
     } else {
         wait();
+        printf(1, "parent %d\n", pid);
 
         // Check that values in parent are not changed
         for(int i = 0; i < sz; i++){

@@ -402,7 +402,7 @@ int cowpgflthandler(struct proc* p) {
         if((mem = kalloc()) == 0)
           panic("CoW: memory allocation failed");
         memmove(mem, (char*)pa, PGSIZE);
-        // clear present bit and write bit
+        // clear present bit, add write bit
         *pte &= ~PTE_P;
         *pte |= PTE_W;
         flags = PTE_FLAGS(*pte);
@@ -411,7 +411,6 @@ int cowpgflthandler(struct proc* p) {
           panic("CoW: Page table mapping failed.");
         // change ref_cnt
         kdecrement((char*)pa);
-        kincrement((char*)PADDR(mem));
         lcr3(PADDR(pgdir));
   } else {
     // restore write permission to the page. No need to copy, as the 

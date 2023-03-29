@@ -222,6 +222,7 @@ wait(void)
       // exited child processes enter into zombie state
       if(p->state == ZOMBIE){
         // Found one.
+        // cprintf("Free zombie child %d\n", p->pid);
         pid = p->pid;
         kdecrement(p->kstack);
         p->kstack = 0;

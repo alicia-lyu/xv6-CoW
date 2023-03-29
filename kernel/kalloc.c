@@ -55,7 +55,7 @@ kfree(char *v)
   if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
     panic("kfree");
   else if ((ref = kmem.ref_cnt[(uint)v / PGSIZE]) != 1) {
-    cprintf("%d ref_cnt: %d\n", (uint)v, ref);
+    // cprintf("%d ref_cnt: %d\n", (uint)v, ref);
     panic("kfree page used by multiple processes.");
     // page must be used no more than 1 process when freed 
   }
@@ -105,6 +105,7 @@ void kincrement(char *v) {
 
 void kdecrement(char *v) {
   if (kmem.ref_cnt[(uint)v / PGSIZE] == 1) {
+    // cprintf("kfree %d by proc id %d\n", (uint)v, proc->pid);
     kfree(v);
   } else {
     acquire(&kmem.lock);
