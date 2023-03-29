@@ -24,8 +24,19 @@ int main(void) {
         for(int i = 0; i < sz; i++){
             arr[i] = i * mypid;
         }
+        int* arr2 = (int*)malloc(sz * sizeof(int));
+        for(int i = 0; i < sz; i++){
+            arr2[i] = i * mypid;
+        }
+        int* arr3 = (int*)malloc(sz * sizeof(int));
+        for(int i = 0; i < sz; i++){
+            arr3[i] = i * mypid;
+        }
+        free(arr);
+        free(arr2);
+        free(arr3);
         int child_free_cnt2 = getFreePagesCount();
-        printf(1, "Free pages of child. Before: %d, after: %d\n", child_free_cnt1, child_free_cnt2);
+        printf(1, "Free pages changed by child. Before: %d, after: %d\n", child_free_cnt1, child_free_cnt2);
     } else {
         wait();
 
@@ -43,7 +54,7 @@ int main(void) {
         // After child exits, parent should have same number of free pages
         // **but for the paged allocated during fork()** The original test 
         // is mistaken. -- note by Alicia
-        if(final_free < init_free-1){
+        if(final_free != init_free){
             printf(1, "Parent have fewer freepages. Before: %d, after: %d\n", init_free, final_free);
             printf(1, "XV6_COW\t FAILED\n");
             exit();

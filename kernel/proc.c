@@ -219,6 +219,7 @@ wait(void)
       if(p->parent != proc)
         continue;
       havekids = 1;
+      // exited child processes enter into zombie state
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
