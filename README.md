@@ -1,9 +1,3 @@
-READ ME
+# Copy-on-Write (CoW) `fork()` in xv6 kernel
 
-* group number: 21
-* name: Alicia Lyu, Shuyao Li
-* cs login: wenhui, shuyaol
-* wisc ID: wlyu27, sli796
-* email: wlyu27@wisc.edu, sli796@wisc.edu
-* section: Tu Th 9:30-10:45 AM
-* status of implementation: all tests passed
+This group project implemented with **C** code the Copy-on-Write (CoW) `fork()` in the xv6 kernel. Compared with the original `fork()` which copies all of the parent process's user-space memory into the child, the new implementation only copies the page which the child process tries to write into, increasing memory efficiency.
